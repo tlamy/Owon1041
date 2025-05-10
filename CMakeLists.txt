@@ -18,7 +18,12 @@ find_package(Qt5 COMPONENTS
 
 add_executable(Owon1041 main.cpp
         MainWindow.cpp
-        MainWindow.h)
+        MainWindow.h
+        Settings.cpp
+        Settings.h
+        ConnectDialog.cpp
+        ConnectDialog.h
+)
 target_link_libraries(Owon1041
         Qt5::Core
         Qt5::Gui

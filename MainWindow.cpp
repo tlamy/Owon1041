@@ -5,11 +5,26 @@
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QWidget>
 #include <QResizeEvent>
+#include <QTimer>
 
+#include "ConnectDialog.h"
+
+// In your constructor or initialization method
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
+    // Initialize settings with your app/organization name
+    settings = new Settings("MacWake", "Owon1041", this);
+    settings->load(); // Load stored settings
+
+    // Apply window position/size from settings
+    if (settings->windowWidth() > 0 && settings->windowHeight() > 0) {
+        setGeometry(settings->windowX(), settings->windowY(),
+                    settings->windowWidth(), settings->windowHeight());
+    }
+
     setupUi(this);
-    setupConnections();
+
+    QTimer::singleShot(50, this, &MainWindow::connectSerial);
 }
 
 MainWindow::~MainWindow()
@@ -22,15 +37,16 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     QWidget *centralwidget;
     if (MainWindow->objectName().isEmpty())
         MainWindow->setObjectName("MainWindow");
-    MainWindow->resize(450, 150);
+    setGeometry(settings->windowX(), settings->windowY(),
+                settings->windowWidth(), settings->windowHeight());
     MainWindow->setMinimumSize(QSize(450, 150));
-    MainWindow->setWindowTitle("MainWindow");
-    
+    MainWindow->setWindowTitle("MacWake OWON XDM-1041");
+
     centralwidget = new QWidget(MainWindow);
     centralwidget->setObjectName("centralwidget");
     
     // Create measurement label with text in constructor
-    measurement = new QLabel("0.1235 mF", centralwidget);
+    measurement = new QLabel("0.1235 µF", centralwidget);
     measurement->setObjectName("measurement");
     QFont font;
     //font.setFamily("Menlo");
@@ -81,6 +97,20 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     QMetaObject::connectSlotsByName(MainWindow);
 }
 
+void MainWindow::setupConnections()
+{
+    connect(btn_50_v, &QPushButton::clicked, this, &MainWindow::onVoltage50V);
+    connect(btn_auto_v, &QPushButton::clicked, this, &MainWindow::onVoltageAuto);
+    connect(btn_short, &QPushButton::clicked, this, &MainWindow::onShort);
+    connect(btn_diode, &QPushButton::clicked, this, &MainWindow::onDiode);
+    connect(btn_50_kr, &QPushButton::clicked, this, &MainWindow::onResistance50K);
+    connect(btn_auto_r, &QPushButton::clicked, this, &MainWindow::onResistanceAuto);
+    connect(btn_50_f, &QPushButton::clicked, this, &MainWindow::onCapacitance50uF);
+    connect(btn_auto_f, &QPushButton::clicked, this, &MainWindow::onCapacitanceAuto);
+    connect(btn_freq, &QPushButton::clicked, this, &MainWindow::onFrequency);
+    connect(btn_period, &QPushButton::clicked, this, &MainWindow::onPeriod);
+}
+
 void MainWindow::resizeEvent(QResizeEvent *event) {
     QMainWindow::resizeEvent(event); // Call base class implementation
 
@@ -98,8 +128,8 @@ void MainWindow::setupPositions(int width, int height) {
 
     // max width
     measurement->setGeometry(QRect(2, 0, width-4, 80));
-    int btngroup_y1 = measurement->y() + measurement->height() + 5;
-    int btngroup_y2 = btngroup_y1 + btn_height+2;
+    int btngroup_y1 = measurement->y() + measurement->height() + 2;
+    int btngroup_y2 = btngroup_y1 + btn_height + 1;
 
     btn_50_v->setGeometry(QRect(btn_x, btngroup_y1, btn_width, btn_height));
     btn_auto_v->setGeometry(QRect(btn_x, btngroup_y2, btn_width, btn_height));
@@ -113,18 +143,25 @@ void MainWindow::setupPositions(int width, int height) {
     btn_period->setGeometry(QRect(btn_x+280, btngroup_y2, btn_width, btn_height));
 }
 
-void MainWindow::setupConnections()
-{
-    connect(btn_50_v, &QPushButton::clicked, this, &MainWindow::onVoltage50V);
-    connect(btn_auto_v, &QPushButton::clicked, this, &MainWindow::onVoltageAuto);
-    connect(btn_short, &QPushButton::clicked, this, &MainWindow::onShort);
-    connect(btn_diode, &QPushButton::clicked, this, &MainWindow::onDiode);
-    connect(btn_50_kr, &QPushButton::clicked, this, &MainWindow::onResistance50K);
-    connect(btn_auto_r, &QPushButton::clicked, this, &MainWindow::onResistanceAuto);
-    connect(btn_50_f, &QPushButton::clicked, this, &MainWindow::onCapacitance50uF);
-    connect(btn_auto_f, &QPushButton::clicked, this, &MainWindow::onCapacitanceAuto);
-    connect(btn_freq, &QPushButton::clicked, this, &MainWindow::onFrequency);
-    connect(btn_period, &QPushButton::clicked, this, &MainWindow::onPeriod);
+void MainWindow::connectSerial() {
+    if (this->settings->device().isEmpty()) {
+        this->openConnectDialog();
+    }
+}
+
+bool MainWindow::openConnectDialog() {
+    ConnectDialog dialog(this);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        // Get the configured serial port
+        auto serialPort = dialog.getConfiguredSerialPort();
+        if (serialPort) {
+            // Store the selected port in settings
+            settings->setDevice(serialPort->portName());
+            return true;
+        }
+    }
+    return false;
 }
 
 // Slot implementations

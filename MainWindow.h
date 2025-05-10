@@ -5,6 +5,8 @@
 #include <QLabel>
 #include <QPushButton>
 
+#include "Settings.h"
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -13,6 +15,9 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     void setupUi(QMainWindow *MainWindow);
+
+    Settings *settings;
+
 protected:
     void resizeEvent(QResizeEvent *event) override;
     void setupPositions(int width, int height);
@@ -42,7 +47,9 @@ private:
     QPushButton *btn_freq;
     QPushButton *btn_period;
 
-    void setupConnections();
+    void connectSerial();
+
+    bool openConnectDialog();
 };
 
 #endif // MAINWINDOW_H
