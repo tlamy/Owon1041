@@ -1,10 +1,10 @@
 #include "MainWindow.h"
-#include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QMainWindow>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QWidget>
+#include <QResizeEvent>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 {
@@ -30,7 +30,7 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     centralwidget->setObjectName("centralwidget");
     
     // Create measurement label with text in constructor
-    measurement = new QLabel("0.1235 µF", centralwidget);
+    measurement = new QLabel("0.1235 mF", centralwidget);
     measurement->setObjectName("measurement");
     QFont font;
     //font.setFamily("Menlo");
@@ -40,6 +40,9 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     measurement->setFrameShape(QFrame::StyledPanel);
     measurement->setFrameShadow(QFrame::Raised);
     measurement->setTextFormat(Qt::PlainText);
+    measurement->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    measurement->setMargin(0);
+    measurement->setStyleSheet("QLabel { padding: 0px; margin: 0px; }");
 
     // Create buttons with text in constructors
     btn_50_v = new QPushButton("50 V", centralwidget);
@@ -88,19 +91,26 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
 }
 
 void MainWindow::setupPositions(int width, int height) {
-    int btngroup_y1 = 85;
-    int btngroup_y2 = 110;
+    int btn_width = 70;
+    int btn_height = 32;
+    int btnbar_w = 350;
+    int btn_x = (width-btnbar_w)/2;
+
+    // max width
     measurement->setGeometry(QRect(2, 0, width-4, 80));
-    btn_50_v->setGeometry(QRect(40, btngroup_y1, 71, 32));
-    btn_auto_v->setGeometry(QRect(40, btngroup_y2, 71, 32));
-    btn_short->setGeometry(QRect(110, btngroup_y1, 71, 31));
-    btn_diode->setGeometry(QRect(110, btngroup_y2, 71, 31));
-    btn_50_kr->setGeometry(QRect(180, btngroup_y1, 71, 31));
-    btn_auto_r->setGeometry(QRect(180, btngroup_y2, 71, 31));
-    btn_50_f->setGeometry(QRect(250, btngroup_y1, 71, 31));
-    btn_auto_f->setGeometry(QRect(250, btngroup_y2, 71, 31));
-    btn_freq->setGeometry(QRect(320, btngroup_y1, 71, 31));
-    btn_period->setGeometry(QRect(320, btngroup_y2, 71, 31));
+    int btngroup_y1 = measurement->y() + measurement->height() + 5;
+    int btngroup_y2 = btngroup_y1 + btn_height+2;
+
+    btn_50_v->setGeometry(QRect(btn_x, btngroup_y1, btn_width, btn_height));
+    btn_auto_v->setGeometry(QRect(btn_x, btngroup_y2, btn_width, btn_height));
+    btn_short->setGeometry(QRect(btn_x+70, btngroup_y1, btn_width, btn_height));
+    btn_diode->setGeometry(QRect(btn_x+70, btngroup_y2, btn_width, btn_height));
+    btn_50_kr->setGeometry(QRect(btn_x+140, btngroup_y1, btn_width, btn_height));
+    btn_auto_r->setGeometry(QRect(btn_x+140, btngroup_y2, btn_width, btn_height));
+    btn_50_f->setGeometry(QRect(btn_x+210, btngroup_y1, btn_width, btn_height));
+    btn_auto_f->setGeometry(QRect(btn_x+210, btngroup_y2, btn_width, btn_height));
+    btn_freq->setGeometry(QRect(btn_x+280, btngroup_y1, btn_width, btn_height));
+    btn_period->setGeometry(QRect(btn_x+280, btngroup_y2, btn_width, btn_height));
 }
 
 void MainWindow::setupConnections()
