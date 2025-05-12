@@ -191,7 +191,7 @@ bool MainWindow::openConnectDialog() {
 
 void MainWindow::updateMeasurement() {
     if (!this->m_port) {
-        std::cerr << "Port is NULL, stopping timer"<<std::endl;
+        std::cerr << "Port is NULL, stopping timer" << std::endl;
         this->m_timer->stop();
         this->m_timer->deleteLater();
         this->m_timer = nullptr;
@@ -200,7 +200,7 @@ void MainWindow::updateMeasurement() {
     this->m_port->write("MEAS?\n");
     std::cerr << "MEAS? sent, waiting for response" << std::endl;
     if (!this->m_port->waitForReadyRead(5000)) {
-        std::cerr << "Read timeout, stopping timer"<<std::endl;
+        std::cerr << "Read timeout, stopping timer" << std::endl;
         this->m_timer->stop();
         this->m_timer->deleteLater();
         this->m_timer = nullptr;
@@ -259,7 +259,8 @@ void MainWindow::onPeriod() {
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     if (obj == measurement) {
         if (event->type() == QEvent::MouseButtonRelease) {
-            if (const QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event); mouseEvent->button() == Qt::LeftButton) {
+            if (const QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+                mouseEvent->button() == Qt::LeftButton) {
                 onMeasurementClicked();
                 return true;
             }

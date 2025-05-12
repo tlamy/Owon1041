@@ -8,19 +8,21 @@
 #include "ConnectDialog.h"
 #include "Settings.h"
 
-class MainWindow final : public QMainWindow
-{
+class MainWindow final : public QMainWindow {
     Q_OBJECT
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+
     ~MainWindow() override;
+
     void setupUi(QMainWindow *MainWindow);
 
     Settings *settings;
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+
     void setupPositions(int width, int height) const;
 private slots:
     void onVoltage50V();
@@ -37,7 +39,8 @@ private slots:
     bool eventFilter(QObject *obj, QEvent *event) override;
 
     void onMeasurementClicked();
-    void updateMeasurement();  // Make sure this exists and is declared as a slot
+
+    void updateMeasurement(); // Make sure this exists and is declared as a slot
 
 
 private:
@@ -63,8 +66,8 @@ private:
     bool openConnectDialog();
 
 
-    QTimer * m_timer = nullptr;
-    QSerialPort * m_port = nullptr;
+    QTimer *m_timer = nullptr;
+    QSerialPort *m_port = nullptr;
 };
 
 #endif // MAINWINDOW_H

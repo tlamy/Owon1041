@@ -54,6 +54,7 @@ private:
     void populatePortsList() const;
 
     bool configureSerialPort(const QString &device);
+
     void tryConfiguredPort();
 
 private:
