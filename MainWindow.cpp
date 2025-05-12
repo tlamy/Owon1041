@@ -1,4 +1,6 @@
 #include "MainWindow.h"
+
+#include <iostream>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QMainWindow>
@@ -6,12 +8,12 @@
 #include <QtWidgets/QWidget>
 #include <QResizeEvent>
 #include <QTimer>
-
+#include <QMouseEvent>
+#include <QDebug>
 #include "ConnectDialog.h"
 
 // In your constructor or initialization method
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
-{
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Initialize settings with your app/organization name
     settings = new Settings("MacWake", "Owon1041", this);
     settings->load(); // Load stored settings
@@ -24,17 +26,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent)
 
     setupUi(this);
 
-    QTimer::singleShot(50, this, &MainWindow::connectSerial);
+    QTimer::singleShot(2000, this, &MainWindow::connectSerial);
 }
 
-MainWindow::~MainWindow()
-{
+MainWindow::~MainWindow() {
     // No need to delete UI elements as they are deleted when parent is deleted
 }
 
-void MainWindow::setupUi(QMainWindow *MainWindow)
-{
-    QWidget *centralwidget;
+void MainWindow::setupUi(QMainWindow *MainWindow) {
     if (MainWindow->objectName().isEmpty())
         MainWindow->setObjectName("MainWindow");
     setGeometry(settings->windowX(), settings->windowY(),
@@ -42,9 +41,10 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     MainWindow->setMinimumSize(QSize(450, 150));
     MainWindow->setWindowTitle("MacWake OWON XDM-1041");
 
-    centralwidget = new QWidget(MainWindow);
+    // ReSharper disable once CppDFAMemoryLeak
+    const auto centralwidget = new QWidget(MainWindow);
     centralwidget->setObjectName("centralwidget");
-    
+
     // Create measurement label with text in constructor
     measurement = new QLabel("0.1235 µF", centralwidget);
     measurement->setObjectName("measurement");
@@ -58,7 +58,17 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     measurement->setTextFormat(Qt::PlainText);
     measurement->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     measurement->setMargin(0);
-    measurement->setStyleSheet("QLabel { padding: 0px; margin: 0px; }");
+    measurement->setContentsMargins(0, 0, 0, 0);
+    measurement->setStyleSheet("QLabel { padding: 0px; margin: 0px; background-color: #f0f0f0; }");
+    measurement->setToolTip("Click to open connection dialog"); // Add this line
+
+    // Make measurement label clickable by installing event filter
+    measurement->installEventFilter(this);
+
+    // In setupUi function after creating the measurement label
+    measurement->setMouseTracking(true);
+    measurement->setAttribute(Qt::WA_Hover, true);
+    measurement->setFocusPolicy(Qt::StrongFocus);
 
     // Create buttons with text in constructors
     btn_50_v = new QPushButton("50 V", centralwidget);
@@ -94,6 +104,8 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     setupPositions(MainWindow->width(), MainWindow->height());
     MainWindow->setCentralWidget(centralwidget);
 
+    m_connect_dialog = new ConnectDialog(this);
+
     QMetaObject::connectSlotsByName(MainWindow);
 }
 
@@ -114,103 +126,149 @@ void MainWindow::setupConnections()
 void MainWindow::resizeEvent(QResizeEvent *event) {
     QMainWindow::resizeEvent(event); // Call base class implementation
 
-    // Get new window dimensions
-    int width = event->size().width();
-    int height = event->size().height();
-    setupPositions(width, height);
+    setupPositions(event->size().width(), event->size().height());
 }
 
-void MainWindow::setupPositions(int width, int height) {
-    int btn_width = 70;
-    int btn_height = 32;
-    int btnbar_w = 350;
-    int btn_x = (width-btnbar_w)/2;
+void MainWindow::setupPositions(const int width, const int height) const {
+    const int btn_width = 70;
+    const int btn_height = 32;
+    const int btnbar_w = 350;
+    const int btn_x = (width - btnbar_w) / 2;
 
     // max width
-    measurement->setGeometry(QRect(2, 0, width-4, 80));
-    int btngroup_y1 = measurement->y() + measurement->height() + 2;
-    int btngroup_y2 = btngroup_y1 + btn_height + 1;
+    measurement->setGeometry(QRect(2, 0, width - 4, 80));
+    const int btngroup_y1 = measurement->y() + measurement->height() + 2;
+    const int btngroup_y2 = btngroup_y1 + btn_height + 1;
 
     btn_50_v->setGeometry(QRect(btn_x, btngroup_y1, btn_width, btn_height));
     btn_auto_v->setGeometry(QRect(btn_x, btngroup_y2, btn_width, btn_height));
-    btn_short->setGeometry(QRect(btn_x+70, btngroup_y1, btn_width, btn_height));
-    btn_diode->setGeometry(QRect(btn_x+70, btngroup_y2, btn_width, btn_height));
-    btn_50_kr->setGeometry(QRect(btn_x+140, btngroup_y1, btn_width, btn_height));
-    btn_auto_r->setGeometry(QRect(btn_x+140, btngroup_y2, btn_width, btn_height));
-    btn_50_f->setGeometry(QRect(btn_x+210, btngroup_y1, btn_width, btn_height));
-    btn_auto_f->setGeometry(QRect(btn_x+210, btngroup_y2, btn_width, btn_height));
-    btn_freq->setGeometry(QRect(btn_x+280, btngroup_y1, btn_width, btn_height));
-    btn_period->setGeometry(QRect(btn_x+280, btngroup_y2, btn_width, btn_height));
+    btn_short->setGeometry(QRect(btn_x + 70, btngroup_y1, btn_width, btn_height));
+    btn_diode->setGeometry(QRect(btn_x + 70, btngroup_y2, btn_width, btn_height));
+    btn_50_kr->setGeometry(QRect(btn_x + 140, btngroup_y1, btn_width, btn_height));
+    btn_auto_r->setGeometry(QRect(btn_x + 140, btngroup_y2, btn_width, btn_height));
+    btn_50_f->setGeometry(QRect(btn_x + 210, btngroup_y1, btn_width, btn_height));
+    btn_auto_f->setGeometry(QRect(btn_x + 210, btngroup_y2, btn_width, btn_height));
+    btn_freq->setGeometry(QRect(btn_x + 280, btngroup_y1, btn_width, btn_height));
+    btn_period->setGeometry(QRect(btn_x + 280, btngroup_y2, btn_width, btn_height));
 }
 
 void MainWindow::connectSerial() {
+    std::cerr << "Connecting to serial port (auto)" << std::endl;
     if (this->settings->device().isEmpty()) {
         this->openConnectDialog();
+    } else {
+        if (!this->m_connect_dialog->tryPortByName(this->settings->device())) {
+            std::cerr << "Could not connect to serial port " << this->settings->device().toStdString() << std::endl;
+        } else {
+            this->m_port = m_connect_dialog->getConfiguredSerialPort();
+            this->onConnect();
+        }
     }
 }
 
-bool MainWindow::openConnectDialog() {
-    ConnectDialog dialog(this);
+void MainWindow::onConnect() {
+    std::cerr << "Connected; creating timer" << std::endl;
+    this->m_timer = new QTimer(this);
+    this->m_timer->setInterval(100);
+    this->m_timer->setSingleShot(false);
+    connect(this->m_timer, &QTimer::timeout, this, &MainWindow::updateMeasurement);
+    this->m_timer->start();
+}
 
-    if (dialog.exec() == QDialog::Accepted) {
+bool MainWindow::openConnectDialog() {
+    if (m_connect_dialog->exec() == QDialog::Accepted) {
         // Get the configured serial port
-        auto serialPort = dialog.getConfiguredSerialPort();
+        const auto serialPort = m_connect_dialog->getConfiguredSerialPort();
         if (serialPort) {
             // Store the selected port in settings
             settings->setDevice(serialPort->portName());
             return true;
         }
+        this->m_port = serialPort;
     }
     return false;
 }
 
+void MainWindow::updateMeasurement() {
+    if (!this->m_port) {
+        std::cerr << "Port is NULL, stopping timer"<<std::endl;
+        this->m_timer->stop();
+        this->m_timer->deleteLater();
+        this->m_timer = nullptr;
+        return;
+    }
+    this->m_port->write("MEAS?\n");
+    std::cerr << "MEAS? sent, waiting for response" << std::endl;
+    if (!this->m_port->waitForReadyRead(5000)) {
+        std::cerr << "Read timeout, stopping timer"<<std::endl;
+        this->m_timer->stop();
+        this->m_timer->deleteLater();
+        this->m_timer = nullptr;
+        if (this->m_port->isOpen())this->m_port->close();
+        this->m_port = nullptr;
+        return;
+    }
+    char buffer[128];
+    this->m_port->readLine(buffer, sizeof(buffer));
+    std::cerr << "Received " << buffer << std::endl;
+    this->measurement->setText(QString::fromLocal8Bit(buffer));
+}
+
 // Slot implementations
-void MainWindow::onVoltage50V()
-{
+void MainWindow::onVoltage50V() {
     // Implementation
 }
 
-void MainWindow::onVoltageAuto()
-{
+void MainWindow::onVoltageAuto() {
     // Implementation
 }
 
-void MainWindow::onShort()
-{
+void MainWindow::onShort() {
     // Implementation
 }
 
-void MainWindow::onDiode()
-{
+void MainWindow::onDiode() {
     // Implementation
 }
 
-void MainWindow::onResistance50K()
-{
+void MainWindow::onResistance50K() {
     // Implementation
 }
 
-void MainWindow::onResistanceAuto()
-{
+void MainWindow::onResistanceAuto() {
     // Implementation
 }
 
-void MainWindow::onCapacitance50uF()
-{
+void MainWindow::onCapacitance50uF() {
     // Implementation
 }
 
-void MainWindow::onCapacitanceAuto()
-{
+void MainWindow::onCapacitanceAuto() {
     // Implementation
 }
 
-void MainWindow::onFrequency()
-{
+void MainWindow::onFrequency() {
     // Implementation
 }
 
-void MainWindow::onPeriod()
-{
+void MainWindow::onPeriod() {
     // Implementation
+}
+
+// Event filter to handle mouse events on the measurement label
+bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
+    if (obj == measurement) {
+        if (event->type() == QEvent::MouseButtonRelease) {
+            if (const QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event); mouseEvent->button() == Qt::LeftButton) {
+                onMeasurementClicked();
+                return true;
+            }
+        }
+    }
+    return QMainWindow::eventFilter(obj, event);
+}
+
+// Slot to handle measurement label clicks
+void MainWindow::onMeasurementClicked() {
+    openConnectDialog();
 }

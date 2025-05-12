@@ -9,24 +9,26 @@
 #include <QStringList>
 #include <QString>
 
-class ConnectDialog : public QDialog {
+class ConnectDialog final : public QDialog {
     Q_OBJECT
 
 public:
     explicit ConnectDialog(QWidget *parent = nullptr);
 
-    ~ConnectDialog();
+    ~ConnectDialog() override;
 
     // Get the selected serial port
     QString getSelectedPort() const;
 
     // Get configured serial port (with settings applied)
-    QSerialPort *getConfiguredSerialPort();
+    QSerialPort *getConfiguredSerialPort() const;
+
+    bool tryPortByName(const QString &portName);
 
 private slots:
-    void refreshPorts();
-
+    void refreshPorts() const;
     void connectToPort();
+    void tryPort(); // Add this method declaration
 
 private:
     // UI Elements
@@ -42,16 +44,20 @@ private:
     QLabel *statusLabel;
 
     // Active serial port (set when connecting successfully)
-    QSerialPort *serialPort;
+    QSerialPort *serialPort = nullptr;
+    const QString *status;
+    bool isError = false;
 
     // Methods
     void setupUi();
 
-    void populatePortsList();
+    void populatePortsList() const;
 
-    bool configureSerialPort();
+    bool configureSerialPort(const QString &device);
+    void tryConfiguredPort();
 
-    QString tryPort();
+private:
+    bool m_check_ok = false;
 };
 
 #endif // CONNECTDIALOG_H

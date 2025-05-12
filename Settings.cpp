@@ -1,5 +1,8 @@
 #include "Settings.h"
 
+#include <iostream>
+#include <__ostream/basic_ostream.h>
+
 Settings::Settings(QObject *parent)
     : QSettings(parent) {
 }
@@ -19,6 +22,7 @@ void Settings::load() {
     m_windowX = value("window/x", m_windowX).toInt();
     m_windowY = value("window/y", m_windowY).toInt();
     m_device = value("hardware/device", m_device).toString();
+    std::cerr << QString("Load settings: device=" + m_device).toStdString() << std::endl;
 }
 
 void Settings::save() {
@@ -34,22 +38,22 @@ void Settings::save() {
 }
 
 // Setter methods with automatic value updates
-void Settings::setWindowHeight(int height) {
+void Settings::setWindowHeight(const int height) {
     m_windowHeight = height;
     setValue("window/height", height);
 }
 
-void Settings::setWindowWidth(int width) {
+void Settings::setWindowWidth(const int width) {
     m_windowWidth = width;
     setValue("window/width", width);
 }
 
-void Settings::setWindowX(int x) {
+void Settings::setWindowX(const int x) {
     m_windowX = x;
     setValue("window/x", x);
 }
 
-void Settings::setWindowY(int y) {
+void Settings::setWindowY(const int y) {
     m_windowY = y;
     setValue("window/y", y);
 }

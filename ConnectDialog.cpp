@@ -1,20 +1,21 @@
 #include "ConnectDialog.h"
+
+#include <iostream>
 #include <QSerialPortInfo>
 #include <QMessageBox>
 #include <QDialogButtonBox>
 #include <QVBoxLayout>
 #include <QGroupBox>
-#include <QGridLayout>
 #include <QComboBox>
 #include <QPushButton>
 #include <QLabel>
+#include <__ostream/basic_ostream.h>
 
 ConnectDialog::ConnectDialog(QWidget *parent)
     : QDialog(parent), serialPort(nullptr) {
     setWindowTitle("Serial Port Connection");
     setupUi();
     populatePortsList();
-    populateComboBoxes();
 }
 
 ConnectDialog::~ConnectDialog() {
@@ -23,11 +24,11 @@ ConnectDialog::~ConnectDialog() {
 
 void ConnectDialog::setupUi() {
     // Main layout
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    auto mainLayout = new QVBoxLayout(this);
 
     // Port selection group
-    QGroupBox *portGroupBox = new QGroupBox("Port Selection");
-    QHBoxLayout *portLayout = new QHBoxLayout(portGroupBox);
+    auto portGroupBox = new QGroupBox("Port Selection");
+    auto portLayout = new QHBoxLayout(portGroupBox);
 
     portComboBox = new QComboBox();
     refreshButton = new QPushButton("Refresh");
@@ -36,7 +37,7 @@ void ConnectDialog::setupUi() {
     portLayout->addWidget(refreshButton);
 
     // Serial configuration group
-    QGroupBox *configGroupBox = new QGroupBox("Port Configuration");
+    auto configGroupBox = new QGroupBox("Port Configuration");
 
 
     // Status label
@@ -44,12 +45,12 @@ void ConnectDialog::setupUi() {
     statusLabel->setStyleSheet("QLabel { color: gray; }");
 
     // Buttons
-    QDialogButtonBox *buttonBox = new QDialogButtonBox();
+    auto buttonBox = new QDialogButtonBox();
     connectButton = new QPushButton("Connect");
-    auto tryButton = new QPushButton("Test");
+    const auto tryButton = new QPushButton("Test");
     cancelButton = new QPushButton("Cancel");
     buttonBox->addButton(connectButton, QDialogButtonBox::AcceptRole);
-    buttonBox->addButton(tryButton);
+    buttonBox->addButton(tryButton, QDialogButtonBox::ActionRole);
     buttonBox->addButton(cancelButton, QDialogButtonBox::RejectRole);
 
     // Add all widgets to main layout
@@ -60,11 +61,12 @@ void ConnectDialog::setupUi() {
 
     // Connect signals and slots
     connect(refreshButton, &QPushButton::clicked, this, &ConnectDialog::refreshPorts);
+    connect(tryButton, &QPushButton::clicked, this, &ConnectDialog::tryPort);
     connect(connectButton, &QPushButton::clicked, this, &ConnectDialog::connectToPort);
     connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
 }
 
-void ConnectDialog::populatePortsList() {
+void ConnectDialog::populatePortsList() const {
     portComboBox->clear();
 
     // Get available ports
@@ -99,18 +101,21 @@ void ConnectDialog::populatePortsList() {
 }
 
 
-void ConnectDialog::refreshPorts() {
+void ConnectDialog::refreshPorts() const {
     populatePortsList();
 }
 
-bool ConnectDialog::configureSerialPort() {
+bool ConnectDialog::configureSerialPort(const QString &device) {
     // Create a new serial port if not already created
     if (!serialPort) {
         serialPort = new QSerialPort(this);
     }
+    //     if (serialPort->isOpen())serialPort->close();
+    //     delete serialPort;
+    // }
 
     // Configure with current settings
-    serialPort->setPortName(portComboBox->currentData().toString());
+    serialPort->setPortName(device);
     serialPort->setBaudRate(115200);
     serialPort->setDataBits(QSerialPort::DataBits::Data8);
     serialPort->setParity(QSerialPort::Parity::NoParity);
@@ -120,47 +125,88 @@ bool ConnectDialog::configureSerialPort() {
     return true;
 }
 
-QString ConnectDialog::tryPort() {
+bool ConnectDialog::tryPortByName(const QString &portName) {
+    // Configure serial port
+    configureSerialPort(portName);
+    this->tryConfiguredPort();
+    return this->m_check_ok;
+}
+
+void ConnectDialog::tryPort() {
+    std::cerr << "ConnectDialog::tryPort " << portComboBox->currentData().toString().toStdString() << std::endl;
     if (portComboBox->currentIndex() == -1) {
-        return "No serial port selected.";
+        this->statusLabel->setText("No serial port selected.");
+        this->statusLabel->setStyleSheet("QLabel { color: red; }");
+        this->m_check_ok = false;
+        std::cerr << "ConnectDialog::tryPort error";
+        return;
     }
+    this->configureSerialPort(portComboBox->currentData().toString());
+    this->tryConfiguredPort();
+}
+
+void ConnectDialog::tryConfiguredPort() {
     // Try to open the port
+    if (serialPort->isOpen()) { serialPort->close(); }
     if (!serialPort->open(QIODevice::ReadWrite)) {
-        auto result = "Could not open serial port: " + serialPort->errorString();
+        this->statusLabel->setText("Could not open serial port: " + serialPort->errorString());
+        this->statusLabel->setStyleSheet("QLabel { color: red; }");
         delete serialPort;
         serialPort = nullptr;
-        return result;
+        this->m_check_ok = false;
+        return;
     }
-    this->configureSerialPort();
+
+    this->statusLabel->setText("Trying to communicate...");
+    this->statusLabel->setStyleSheet("QLabel { color: grey; }");
+
+    serialPort->write("*IDN?\n");
+    if (!serialPort->waitForBytesWritten(1000)) {
+        this->statusLabel->setText("Can not write to " + serialPort->portName());
+        this->statusLabel->setStyleSheet("QLabel { color: red; }");
+        serialPort->close();
+        delete serialPort;
+        this->m_check_ok = false;
+        return;
+    };
+    if (!serialPort->waitForReadyRead(1000)) {
+        this->statusLabel->setText("Can not read from " + serialPort->portName());
+        this->statusLabel->setStyleSheet("QLabel { color: red; }");
+        serialPort->close();
+        delete serialPort;
+        this->m_check_ok = false;
+        return;
+    }
+    char buffer[1024];
+    serialPort->readLine(buffer, sizeof(buffer));
+
+    const QString input(buffer);
+    QStringList parts = input.split(',');
+
+    if (parts.size() < 4) {
+        this->statusLabel->setText("Invalid response from " + serialPort->portName());
+        this->statusLabel->setStyleSheet("QLabel { color: red; }");
+        serialPort->close();
+        delete serialPort;
+        this->m_check_ok = false;
+        return;
+    }
+    const QString model = parts[1]; // "XDM1041"
+    const QString version = parts[3]; // "V3.8.0"
+
+    std::cerr << "Connected to " << model.toStdString() << " " << version.toStdString() << std::endl;
+    this->statusLabel->setText("Connected: " + model + "  Firmware " + version);
+    this->statusLabel->setStyleSheet("QLabel { color: green; }");
+
+    this->m_check_ok = true;
+    return;
 }
 
 void ConnectDialog::connectToPort() {
-    if (portComboBox->currentIndex() == -1) {
-        QMessageBox::warning(this, "Error", "No serial port selected.");
-        return;
+    tryPort();
+    if (m_check_ok) {
+        accept();
     }
-
-    // Configure the serial port
-    if (!configureSerialPort()) {
-        QMessageBox::critical(this, "Error", "Failed to configure serial port.");
-        return;
-    }
-
-    // Try to open the port
-    if (!serialPort->open(QIODevice::ReadWrite)) {
-        QMessageBox::critical(this, "Connection Failed",
-                              "Could not open serial port: " + serialPort->errorString());
-        delete serialPort;
-        serialPort = nullptr;
-        return;
-    }
-
-    // Port opened successfully
-    statusLabel->setText("Connected to " + portComboBox->currentText());
-    statusLabel->setStyleSheet("QLabel { color: green; }");
-
-    // Accept the dialog
-    accept();
 }
 
 QString ConnectDialog::getSelectedPort() const {
@@ -171,6 +217,6 @@ QString ConnectDialog::getSelectedPort() const {
     return portComboBox->currentData().toString();
 }
 
-QSerialPort *ConnectDialog::getConfiguredSerialPort() {
+QSerialPort *ConnectDialog::getConfiguredSerialPort() const {
     return serialPort;
 }

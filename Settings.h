@@ -4,7 +4,7 @@
 #include <QSettings>
 #include <QString>
 
-class Settings : public QSettings {
+class Settings final : public QSettings {
     Q_OBJECT
 
 public:

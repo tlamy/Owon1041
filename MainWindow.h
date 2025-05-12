@@ -5,22 +5,23 @@
 #include <QLabel>
 #include <QPushButton>
 
+#include "ConnectDialog.h"
 #include "Settings.h"
 
-class MainWindow : public QMainWindow
+class MainWindow final : public QMainWindow
 {
     Q_OBJECT
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+    ~MainWindow() override;
     void setupUi(QMainWindow *MainWindow);
 
     Settings *settings;
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
-    void setupPositions(int width, int height);
+    void setupPositions(int width, int height) const;
 private slots:
     void onVoltage50V();
     void onVoltageAuto();
@@ -32,6 +33,12 @@ private slots:
     void onCapacitanceAuto();
     void onFrequency();
     void onPeriod();
+
+    bool eventFilter(QObject *obj, QEvent *event) override;
+
+    void onMeasurementClicked();
+    void updateMeasurement();  // Make sure this exists and is declared as a slot
+
 
 private:
     // UI elements as member variables (excluding centralwidget)
@@ -47,9 +54,17 @@ private:
     QPushButton *btn_freq;
     QPushButton *btn_period;
 
+    ConnectDialog *m_connect_dialog;
+
     void connectSerial();
 
+    void onConnect();
+
     bool openConnectDialog();
+
+
+    QTimer * m_timer = nullptr;
+    QSerialPort * m_port = nullptr;
 };
 
 #endif // MAINWINDOW_H
