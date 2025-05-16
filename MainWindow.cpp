@@ -6,22 +6,27 @@
 #include <QtWidgets/QMainWindow>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QWidget>
-#include <QResizeEvent>
 #include <QTimer>
 #include <QMouseEvent>
 #include <QDebug>
+#include <QThread>
 #include "ConnectDialog.h"
+
+// Define the static member variable
+Settings *MainWindow::settings = nullptr;
 
 // In your constructor or initialization method
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
-    // Initialize settings with your app/organization name
-    settings = new Settings("MacWake", "Owon1041", this);
-    settings->load(); // Load stored settings
+    if (!MainWindow::settings) {
+        MainWindow::settings = new Settings("MacWake", "Owon1041", this);
+        MainWindow::settings->load(); // Load stored settings
+    }
+
 
     // Apply window position/size from settings
-    if (settings->windowWidth() > 0 && settings->windowHeight() > 0) {
-        setGeometry(settings->windowX(), settings->windowY(),
-                    settings->windowWidth(), settings->windowHeight());
+    if (MainWindow::settings->windowWidth() > 0 && MainWindow::settings->windowHeight() > 0) {
+        setGeometry(MainWindow::settings->windowX(), MainWindow::settings->windowY(),
+                    MainWindow::settings->windowWidth(), MainWindow::settings->windowHeight());
     }
 
     setupUi(this);
@@ -31,13 +36,26 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
 MainWindow::~MainWindow() {
     // No need to delete UI elements as they are deleted when parent is deleted
+    if (m_port) {
+        if (m_port->isOpen()) {
+            m_port->close();
+        }
+        delete m_port;
+        m_port = nullptr;
+    }
+    
+    if (m_timer) {
+        m_timer->stop();
+        delete m_timer;
+        m_timer = nullptr;
+    }
 }
 
 void MainWindow::setupUi(QMainWindow *MainWindow) {
     if (MainWindow->objectName().isEmpty())
         MainWindow->setObjectName("MainWindow");
-    setGeometry(settings->windowX(), settings->windowY(),
-                settings->windowWidth(), settings->windowHeight());
+    setGeometry(this->settings->windowX(), this->settings->windowY(),
+                this->settings->windowWidth(), this->settings->windowHeight());
     MainWindow->setMinimumSize(QSize(450, 150));
     MainWindow->setWindowTitle("MacWake OWON XDM-1041");
 
@@ -45,11 +63,9 @@ void MainWindow::setupUi(QMainWindow *MainWindow) {
     const auto centralwidget = new QWidget(MainWindow);
     centralwidget->setObjectName("centralwidget");
 
-    // Create measurement label with text in constructor
     measurement = new QLabel("0.1235 µF", centralwidget);
     measurement->setObjectName("measurement");
     QFont font;
-    //font.setFamily("Menlo");
     font.setStyleHint(QFont::Monospace);
     font.setPointSize(80);
     measurement->setFont(font);
@@ -62,15 +78,12 @@ void MainWindow::setupUi(QMainWindow *MainWindow) {
     measurement->setStyleSheet("QLabel { padding: 0px; margin: 0px; background-color: #f0f0f0; }");
     measurement->setToolTip("Click to open connection dialog"); // Add this line
 
-    // Make measurement label clickable by installing event filter
     measurement->installEventFilter(this);
 
-    // In setupUi function after creating the measurement label
     measurement->setMouseTracking(true);
     measurement->setAttribute(Qt::WA_Hover, true);
     measurement->setFocusPolicy(Qt::StrongFocus);
 
-    // Create buttons with text in constructors
     btn_50_v = new QPushButton("50 V", centralwidget);
     btn_50_v->setObjectName("btn_50_v");
 
@@ -107,10 +120,15 @@ void MainWindow::setupUi(QMainWindow *MainWindow) {
     m_connect_dialog = new ConnectDialog(this);
 
     QMetaObject::connectSlotsByName(MainWindow);
+
+    this->m_timer = new QTimer(this);
+    this->m_timer->setInterval(100);
+    this->m_timer->setSingleShot(false);
+    connect(this->m_timer, &QTimer::timeout, this, &MainWindow::updateMeasurement);
+
 }
 
-void MainWindow::setupConnections()
-{
+void MainWindow::setupConnections() {
     connect(btn_50_v, &QPushButton::clicked, this, &MainWindow::onVoltage50V);
     connect(btn_auto_v, &QPushButton::clicked, this, &MainWindow::onVoltageAuto);
     connect(btn_short, &QPushButton::clicked, this, &MainWindow::onShort);
@@ -126,6 +144,8 @@ void MainWindow::setupConnections()
 void MainWindow::resizeEvent(QResizeEvent *event) {
     QMainWindow::resizeEvent(event); // Call base class implementation
 
+    this->settings->setWindowWidth(event->size().width());
+    this->settings->setWindowHeight(event->size().height());
     setupPositions(event->size().width(), event->size().height());
 }
 
@@ -154,11 +174,12 @@ void MainWindow::setupPositions(const int width, const int height) const {
 
 void MainWindow::connectSerial() {
     std::cerr << "Connecting to serial port (auto)" << std::endl;
-    if (this->settings->device().isEmpty()) {
+    if (MainWindow::settings->device().isEmpty()) {
         this->openConnectDialog();
     } else {
-        if (!this->m_connect_dialog->tryPortByName(this->settings->device())) {
-            std::cerr << "Could not connect to serial port " << this->settings->device().toStdString() << std::endl;
+        if (!this->m_connect_dialog->tryPortByName(MainWindow::settings->device())) {
+            std::cerr << "Could not connect to serial port " << MainWindow::settings->device().toStdString() <<
+                    std::endl;
         } else {
             this->m_port = m_connect_dialog->getConfiguredSerialPort();
             this->onConnect();
@@ -166,12 +187,26 @@ void MainWindow::connectSerial() {
     }
 }
 
+QString MainWindow::rateToSerial(Settings::Rate rate) {
+    switch (rate) {
+        case Settings::Rate::SLOW:
+            return "S";
+        case Settings::Rate::MEDIUM:
+            return "M";
+        case Settings::Rate::FAST:
+            return "F";
+    }
+    return "F";
+}
+
 void MainWindow::onConnect() {
-    std::cerr << "Connected; creating timer" << std::endl;
-    this->m_timer = new QTimer(this);
-    this->m_timer->setInterval(100);
-    this->m_timer->setSingleShot(false);
-    connect(this->m_timer, &QTimer::timeout, this, &MainWindow::updateMeasurement);
+    // Initialize meter from settings
+
+    this->writeSCPI(QString("RATE " + this->rateToSerial(this->settings->getRate())), false);
+
+    this->writeSCPI("SYST:BEEP:STAT OFF", false);
+    this->onVoltage50V();
+
     this->m_timer->start();
 }
 
@@ -181,7 +216,7 @@ bool MainWindow::openConnectDialog() {
         const auto serialPort = m_connect_dialog->getConfiguredSerialPort();
         if (serialPort) {
             // Store the selected port in settings
-            settings->setDevice(serialPort->portName());
+            MainWindow::settings->setDevice(serialPort->portName());
             return true;
         }
         this->m_port = serialPort;
@@ -197,62 +232,149 @@ void MainWindow::updateMeasurement() {
         this->m_timer = nullptr;
         return;
     }
-    this->m_port->write("MEAS?\n");
-    std::cerr << "MEAS? sent, waiting for response" << std::endl;
-    if (!this->m_port->waitForReadyRead(5000)) {
-        std::cerr << "Read timeout, stopping timer" << std::endl;
-        this->m_timer->stop();
-        this->m_timer->deleteLater();
-        this->m_timer = nullptr;
-        if (this->m_port->isOpen())this->m_port->close();
-        this->m_port = nullptr;
-        return;
+    auto reading = this->writeSCPI("MEAS1?", true);
+    QString display;
+    bool isOk;
+    auto value = reading.toFloat(&isOk);
+    qDebug() << "Received " << reading << " as " << value;
+    if (isOk) {
+        if (false && value < 60E-9) {
+            display = QString::asprintf("%+0.5f n%s", value * 1E9, this->m_unit.toStdString().c_str());
+        } else if (false && value < 60E-6) {
+            display = QString::asprintf("%+0.5f µ%s", value * 1E6, this->m_unit.toStdString().c_str());
+        } else if (false && value < 60E-3) {
+            display = QString::asprintf("%+0.5f m%s", value * 1E3, this->m_unit.toStdString().c_str());
+        } else if (value < 60E-0) {
+            display = QString::asprintf("%+0.5f %s", value, this->m_unit.toStdString().c_str());
+        } else if (value < 60E+3) {
+            display = QString::asprintf("%+0.5f m%s", value * 1E3, this->m_unit.toStdString().c_str());
+        }
     }
-    char buffer[128];
-    this->m_port->readLine(buffer, sizeof(buffer));
-    std::cerr << "Received " << buffer << std::endl;
-    this->measurement->setText(QString::fromLocal8Bit(buffer));
+
+    std::cerr << "Received " << reading.toStdString() << std::endl;
+    this->measurement->setText(display);
 }
 
 // Slot implementations
 void MainWindow::onVoltage50V() {
-    // Implementation
+    this->m_unit = "V";
+    this->writeSCPI("CONF:VOLT:DC 50", false);
 }
 
 void MainWindow::onVoltageAuto() {
-    // Implementation
+    this->m_unit = "V";
+    this->writeSCPI("CONF:VOLT:DC AUTO", false);
 }
 
 void MainWindow::onShort() {
-    // Implementation
+    this->m_unit = "Ω";
+    this->writeSCPI("CONF:CONT", false);
+    if (this->settings->getBeepShort()) {
+        this->writeSCPI("CONT:THRE " + QString(this->settings->getBeepResistance()), false);
+        this->writeSCPI("BEEP:STAT ON", false);
+    } else {
+        this->writeSCPI("BEEP:STAT OFF", false);
+    }
 }
 
 void MainWindow::onDiode() {
-    // Implementation
+    this->m_unit = "V";
+    this->writeSCPI("CONF:DIOD", false);
+    if (this->settings->getBeepDiode()) {
+        this->writeSCPI("BEEP:STAT ON", false);
+    } else {
+        this->writeSCPI("BEEP:STAT OFF", false);
+    }
 }
 
 void MainWindow::onResistance50K() {
-    // Implementation
+    this->m_unit = "Ω";
+    this->writeSCPI("CONF:RES 50E3", false);
 }
 
 void MainWindow::onResistanceAuto() {
-    // Implementation
+    this->m_unit = "Ω";
+    this->writeSCPI("CONF:RES AUTO", false);
 }
 
 void MainWindow::onCapacitance50uF() {
-    // Implementation
+    this->m_unit = "F";
+    this->writeSCPI("CONF:CAP 50E-6", false);
 }
 
 void MainWindow::onCapacitanceAuto() {
-    // Implementation
+    this->m_unit = "F";
+    this->writeSCPI("CONF:CAP AUTO", false);
 }
 
 void MainWindow::onFrequency() {
-    // Implementation
+    this->m_unit = "Hz";
+    this->writeSCPI("CONF:FREQ", false);
 }
 
 void MainWindow::onPeriod() {
-    // Implementation
+    this->m_unit = "%";
+    this->writeSCPI("CONF:PER", false);
+}
+
+void MainWindow::onSerialError(const QString &message) {
+    if (this->m_timer) {
+        this->m_timer->stop();
+        qDebug() << "Stopping timer";
+    }
+    qDebug() << "Serial port error: " << message;
+    std::cerr << "Serial port error, closing\n";
+    if (this->m_port) {
+        if (this->m_port->isOpen()) {
+            this->m_port->close();
+        }
+        delete this->m_port;
+        this->m_port = nullptr; // This is good, but ensure it's consistently used
+    }
+}
+
+QString MainWindow::readSCPI() {
+    if (!m_port || !m_port->isOpen()) {
+        qDebug() << "Serial port not open";
+        return QString();
+    }
+
+    // Increase timeout for reading
+    m_port->waitForReadyRead(500);  // Wait up to 500 ms for data
+
+    QByteArray responseData;
+    QElapsedTimer timer;
+    timer.start();
+
+    while (!responseData.contains('\n')) {
+        if (timer.elapsed() > 1000) {  // 1-second total timeout
+            qDebug() << "Read timeout occurred";
+            emit onSerialError("readSCPI timeout");
+            return QString();
+        }
+
+        if (m_port->bytesAvailable() > 0) {
+            responseData.append(m_port->readAll());
+        } else {
+            QThread::msleep(10);  // Small sleep to prevent busy waiting
+        }
+    }
+
+    QString response = QString::fromUtf8(responseData.trimmed());
+    qDebug() << "Received response:" << response;
+    return response;
+}
+
+QString MainWindow::writeSCPI(const QString &command, bool readResponse) {
+    if (!this->m_port) {
+        std::cerr << "No port open, refusing writeSCPI\n";
+        return nullptr;
+    }
+    qDebug() << "Writing " << command;
+    this->m_port->write(QString(command + "\n").toLocal8Bit());
+    this->m_port->flush();
+    this->m_port->waitForBytesWritten(1000);
+    return readResponse ? readSCPI() : "";
 }
 
 // Event filter to handle mouse events on the measurement label
@@ -271,5 +393,6 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
 
 // Slot to handle measurement label clicks
 void MainWindow::onMeasurementClicked() {
+    this->settings->save();
     openConnectDialog();
 }

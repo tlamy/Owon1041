@@ -18,23 +18,39 @@ public:
 
     void setupUi(QMainWindow *MainWindow);
 
-    Settings *settings;
+    static Settings *settings;
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
 
     void setupPositions(int width, int height) const;
+
 private slots:
     void onVoltage50V();
+
     void onVoltageAuto();
+
     void onShort();
+
     void onDiode();
+
     void onResistance50K();
+
     void onResistanceAuto();
+
     void onCapacitance50uF();
+
     void onCapacitanceAuto();
+
     void onFrequency();
+
     void onPeriod();
+
+    void onSerialError(const QString &message);
+
+    QString readSCPI();
+
+    QString writeSCPI(const QString &command, bool readResponse);
 
     bool eventFilter(QObject *obj, QEvent *event) override;
 
@@ -58,12 +74,17 @@ private:
     QPushButton *btn_period;
 
     ConnectDialog *m_connect_dialog;
+    QString m_unit;
 
     void connectSerial();
+
+    static QString rateToSerial(Settings::Rate rate);
 
     void onConnect();
 
     bool openConnectDialog();
+
+    void setupConnections();
 
 
     QTimer *m_timer = nullptr;

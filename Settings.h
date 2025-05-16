@@ -3,49 +3,70 @@
 
 #include <QSettings>
 #include <QString>
+#include <map> // Required for std::map in .cpp
 
-class Settings final : public QSettings {
+class Settings : public QSettings {
     Q_OBJECT
 
 public:
-    // Constructor uses default QSettings format and location
+    enum class Rate { SLOW, MEDIUM, FAST };
+
     explicit Settings(QObject *parent = nullptr);
-    
-    // Optional: Custom constructor with specific organization/application
+
     Settings(const QString &organization, const QString &application, QObject *parent = nullptr);
-    
-    // Initialize default values
+
     void init();
-    
-    // Load settings from storage
+
     void load();
-    
-    // Save settings to storage
+
     void save();
 
-    // Properties with getters and setters
+    // Getter methods
     int windowHeight() const { return m_windowHeight; }
-    void setWindowHeight(int height);
-    
     int windowWidth() const { return m_windowWidth; }
-    void setWindowWidth(int width);
-    
     int windowX() const { return m_windowX; }
-    void setWindowX(int x);
-    
     int windowY() const { return m_windowY; }
-    void setWindowY(int y);
-    
     QString device() const { return m_device; }
+    Rate getRate() const { return m_rate; }
+    bool getBeepShort() const { return m_beep_short; }
+    bool getBeepDiode() const { return m_beep_diode; }
+    int getBeepResistance() const { return m_beep_resistance; }
+
+
+    // Setter methods
+    void setWindowHeight(int height);
+
+    void setWindowWidth(int width);
+
+    void setWindowX(int x);
+
+    void setWindowY(int y);
+
     void setDevice(const QString &device);
 
+    void setRate(Rate rate); // Added setter for rate
+    void setBeepShort(bool enabled);
+
+    void setBeepDiode(bool enabled);
+
+    void setBeepResistance(int threshold);
+
+
+    static Rate stringToRate(QString value, Rate dflt);
+
+    static QString rateToString(Rate rate);
+
 private:
-    // Private member variables
-    int m_windowHeight = 150;
-    int m_windowWidth = 450;
+    // Default values (can be overridden by loaded settings)
+    int m_windowHeight = 600;
+    int m_windowWidth = 800;
     int m_windowX = 100;
     int m_windowY = 100;
     QString m_device = "";
+    Rate m_rate = Rate::FAST;
+    bool m_beep_short = true;
+    bool m_beep_diode = true;
+    int m_beep_resistance = 50;
 };
 
 #endif // SETTINGS_H

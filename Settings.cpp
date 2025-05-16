@@ -1,7 +1,6 @@
 #include "Settings.h"
 
 #include <iostream>
-#include <__ostream/basic_ostream.h>
 
 Settings::Settings(QObject *parent)
     : QSettings(parent) {
@@ -22,7 +21,10 @@ void Settings::load() {
     m_windowX = value("window/x", m_windowX).toInt();
     m_windowY = value("window/y", m_windowY).toInt();
     m_device = value("hardware/device", m_device).toString();
-    std::cerr << QString("Load settings: device=" + m_device).toStdString() << std::endl;
+    m_rate = stringToRate(value("rate", rateToString(m_rate)).toString(), m_rate); // Use m_rate as default
+    m_beep_short = value("beep_short", m_beep_short).toBool();
+    m_beep_diode = value("beep_diode", m_beep_diode).toBool();
+    m_beep_resistance = value("beep_threshold", m_beep_resistance).toInt();
 }
 
 void Settings::save() {
@@ -32,8 +34,13 @@ void Settings::save() {
     setValue("window/x", m_windowX);
     setValue("window/y", m_windowY);
     setValue("hardware/device", m_device);
+    setValue("rate", rateToString(m_rate)); // Save rate
+    setValue("beep_short", m_beep_short);
+    setValue("beep_diode", m_beep_diode);
+    setValue("beep_threshold", m_beep_resistance);
 
     // Ensure settings are written to disk
+    std::cerr << "Settings saved." << std::endl;
     sync();
 }
 
@@ -61,4 +68,64 @@ void Settings::setWindowY(const int y) {
 void Settings::setDevice(const QString &device) {
     m_device = device;
     setValue("hardware/device", device);
+}
+
+void Settings::setRate(Rate rate) {
+    // Added implementation for setRate
+    if (m_rate != rate) {
+        m_rate = rate;
+        setValue("rate", rateToString(rate));
+        // You might want to call sync() here if you want immediate persistence
+        // or rely on the global save() method.
+    }
+}
+
+void Settings::setBeepShort(bool enabled) {
+    if (m_beep_short != enabled) {
+        m_beep_short = enabled;
+        setValue("beep_short", m_beep_short);
+    }
+}
+
+void Settings::setBeepDiode(bool enabled) {
+    if (m_beep_diode != enabled) {
+        m_beep_diode = enabled;
+        setValue("beep_diode", m_beep_diode);
+    }
+}
+
+void Settings::setBeepResistance(int threshold) {
+    if (m_beep_resistance != threshold) {
+        m_beep_resistance = threshold;
+        setValue("beep_threshold", m_beep_resistance);
+    }
+}
+
+
+Settings::Rate Settings::stringToRate(QString value, Rate dflt) {
+    static const std::map<std::string, Rate> enumMap = {
+        {"slow", Rate::SLOW},
+        {"medium", Rate::MEDIUM},
+        {"fast", Rate::FAST}
+    };
+    std::string lower = value.toLower().toStdString();
+
+    auto it = enumMap.find(lower);
+    if (it != enumMap.end()) {
+        return it->second; // Found, return the enum value
+    }
+    return dflt;
+}
+
+QString Settings::rateToString(Rate rate) {
+    switch (rate) {
+        case Rate::SLOW:
+            return "slow";
+        case Rate::MEDIUM:
+            return "medium";
+        case Rate::FAST:
+            return "fast";
+        default:
+            return "unknown"; // Should ideally not happen
+    }
 }
