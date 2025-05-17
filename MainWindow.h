@@ -3,7 +3,6 @@
 
 #include <QLabel>
 #include <QMainWindow>
-#include <QPushButton>
 
 #include "ConnectDialog.h"
 #include "Settings.h"
@@ -48,9 +47,11 @@ private slots:
 
   void onSerialError(const QString &message);
 
-  QString readSCPI();
+  [[nodiscard]] QString readSCPI() const;
 
-  QString writeSCPI(const QString &command, bool readResponse);
+  void writeSCPIStatement(const QString &command) const;
+
+  QString writeSCPICommand(const QString &command) const; // NOLINT(*-use-nodiscard)
 
   bool eventFilter(QObject *obj, QEvent *event) override;
 
@@ -82,8 +83,6 @@ private:
   void onConnect();
 
   bool openConnectDialog();
-
-  void setupConnections();
 
   QTimer *m_timer = nullptr;
   QSerialPort *m_port = nullptr;

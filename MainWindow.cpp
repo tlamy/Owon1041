@@ -14,7 +14,7 @@
 
 Settings *MainWindow::settings = nullptr;
 
-MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) { // NOLINT(*-pro-type-member-init)
   if (!MainWindow::settings) {
     MainWindow::settings = new Settings("MacWake", "Owon1041", this);
     MainWindow::settings->load();
@@ -53,8 +53,8 @@ MainWindow::~MainWindow() {
 void MainWindow::setupUi(QMainWindow *MainWindow) {
   if (MainWindow->objectName().isEmpty())
     MainWindow->setObjectName("MainWindow");
-  setGeometry(this->settings->windowX(), this->settings->windowY(),
-              this->settings->windowWidth(), this->settings->windowHeight());
+  setGeometry(MainWindow::settings->windowX(), MainWindow::settings->windowY(),
+              MainWindow::settings->windowWidth(), MainWindow::settings->windowHeight());
   MainWindow->setMinimumSize(QSize(580, 162));
   MainWindow->setWindowTitle("MacWake OWON XDM-1041");
 
@@ -62,14 +62,14 @@ void MainWindow::setupUi(QMainWindow *MainWindow) {
   const auto centralwidget = new QWidget(MainWindow);
   centralwidget->setObjectName("centralwidget");
 
-  measurement = new QLabel("Click 2 connect", centralwidget);
+  measurement = new QLabel("not connected", centralwidget);
   measurement->setObjectName("measurement");
 
   QFont font;
   font.setStyleHint(QFont::Monospace);
   font.setFamily("monospace");
   font.setFixedPitch(true);
-  font.setPointSize(80);
+  font.setPointSize(72);
 
 #if defined(Q_OS_WIN)
   font.setFamily("Consolas");
@@ -151,13 +151,11 @@ void MainWindow::setupUi(QMainWindow *MainWindow) {
           &MainWindow::updateMeasurement);
 }
 
-void MainWindow::setupConnections() {}
-
 void MainWindow::resizeEvent(QResizeEvent *event) {
   QMainWindow::resizeEvent(event);
 
-  this->settings->setWindowWidth(event->size().width());
-  this->settings->setWindowHeight(event->size().height());
+  MainWindow::settings->setWindowWidth(event->size().width());
+  MainWindow::settings->setWindowHeight(event->size().height());
   setupPositions(event->size().width(), event->size().height());
 }
 
@@ -166,7 +164,7 @@ void MainWindow::setupPositions(const int width, const int height) const {
   const int btn_height = 32;
   const int btnbar_w = 350;
   const int btn_x = (width - btnbar_w) / 2;
-  std::cerr << "w=" << width << " h=" << height << std::endl;
+  //std::cerr << "w=" << width << " h=" << height << std::endl;
 
   auto measureHeight = measurement->fontMetrics().height();
   // max width
@@ -219,10 +217,10 @@ QString MainWindow::rateToSerial(Settings::Rate rate) {
 }
 
 void MainWindow::onConnect() {
-  this->writeSCPI(
-      QString("RATE " + this->rateToSerial(this->settings->getRate())), false);
+  this->writeSCPIStatement(
+      QString("RATE " + rateToSerial(settings->getRate())));
 
-  this->writeSCPI("SYST:BEEP:STAT OFF", false);
+  this->writeSCPIStatement("SYST:BEEP:STAT OFF");
   this->onVoltage50V();
 
   this->m_timer->start();
@@ -248,7 +246,7 @@ void MainWindow::updateMeasurement() {
     this->m_timer = nullptr;
     return;
   }
-  auto reading = this->writeSCPI("MEAS1:SHOW?", true);
+  auto reading = this->writeSCPICommand("MEAS1:SHOW?");
 
   QString display = reading.replace("\u00a6\u00b8", "Ω Ohm")
                         .replace("\u00aa\u00cc", "µ")
@@ -259,66 +257,63 @@ void MainWindow::updateMeasurement() {
 
 void MainWindow::onVoltage50V() {
   this->m_unit = "V";
-  this->writeSCPI("CONF:VOLT:DC 50", false);
+  this->writeSCPIStatement("CONF:VOLT:DC 50");
 }
 
 void MainWindow::onVoltageAuto() {
   this->m_unit = "V";
-  this->writeSCPI("CONF:VOLT:DC AUTO", false);
+  this->writeSCPIStatement("CONF:VOLT:DC AUTO");
 }
 
 void MainWindow::onShort() {
   this->m_unit = "Ω";
-  this->writeSCPI("CONF:CONT", false);
-  if (this->settings->getBeepShort()) {
-    qDebug() << "Beep resistance: " << this->settings->getBeepResistance();
-    this->writeSCPI(QString("CONT:THRE ") +
-                        QString(this->settings->getBeepResistance()),
-                    false);
-    this->writeSCPI("SYST:BEEP:STAT ON", false);
+  this->writeSCPIStatement("CONF:CONT");
+  if (settings->getBeepShort()) {
+    qDebug() << "Beep resistance: " << MainWindow::settings->getBeepResistance();
+    this->writeSCPIStatement(QString("CONT:THRE ") +
+                        QString::number(MainWindow::settings->getBeepResistance()));
+    this->writeSCPIStatement("SYST:BEEP:STAT ON");
   } else {
-    this->writeSCPI("SYST:BEEP:STAT OFF", false);
+    this->writeSCPIStatement("SYST:BEEP:STAT OFF");
   }
 }
 
 void MainWindow::onDiode() {
-  this->m_unit = "V";
-  if (this->settings->getBeepDiode()) {
-    this->writeSCPI("SYST:BEEP:STAT ON", false);
+  if (MainWindow::settings->getBeepDiode()) {
+    this->writeSCPIStatement("SYST:BEEP:STAT ON");
   } else {
-    this->writeSCPI("SYST:BEEP:STAT OFF", false);
+    this->writeSCPIStatement("SYST:BEEP:STAT OFF");
   }
-  this->writeSCPI("CONF:DIOD", false);
+  this->writeSCPIStatement("CONF:DIOD");
 }
 
 void MainWindow::onResistance50K() {
-  this->m_unit = "Ω";
-  this->writeSCPI("CONF:RES 50E3", false);
+  this->writeSCPIStatement("CONF:RES 50E3");
 }
 
 void MainWindow::onResistanceAuto() {
   this->m_unit = "Ω";
-  this->writeSCPI("CONF:RES AUTO", false);
+  this->writeSCPIStatement("CONF:RES AUTO");
 }
 
 void MainWindow::onCapacitance50uF() {
   this->m_unit = "F";
-  this->writeSCPI("CONF:CAP 50E-6", false);
+  this->writeSCPIStatement("CONF:CAP 50E-6");
 }
 
 void MainWindow::onCapacitanceAuto() {
   this->m_unit = "F";
-  this->writeSCPI("CONF:CAP AUTO", false);
+  this->writeSCPIStatement("CONF:CAP AUTO");
 }
 
 void MainWindow::onFrequency() {
   this->m_unit = "Hz";
-  this->writeSCPI("CONF:FREQ", false);
+  this->writeSCPIStatement("CONF:FREQ");
 }
 
 void MainWindow::onPeriod() {
   this->m_unit = "%";
-  this->writeSCPI("CONF:PER", false);
+  this->writeSCPIStatement("CONF:PER");
 }
 
 void MainWindow::onSerialError(const QString &message) {
@@ -337,15 +332,15 @@ void MainWindow::onSerialError(const QString &message) {
   }
 }
 
-QString MainWindow::readSCPI() {
+QString MainWindow::readSCPI() const {
   if (!m_port || !m_port->isOpen()) {
     qDebug() << "Serial port not open";
-    return QString();
+    return {};
   }
 
   if (!m_port->waitForReadyRead(500)) {
     qDebug() << "Serial port not ready";
-    return QString();
+    return {};
   }
 
   QByteArray responseData;
@@ -356,7 +351,7 @@ QString MainWindow::readSCPI() {
     if (timer.elapsed() > 100) {
       qDebug() << "Read timeout occurred";
       // emit onSerialError("readSCPI timeout");
-      return QString();
+      return {};
     }
 
     if (m_port->bytesAvailable() > 0) {
@@ -390,7 +385,18 @@ QString MainWindow::readSCPI() {
   return response;
 }
 
-QString MainWindow::writeSCPI(const QString &command, bool readResponse) {
+void MainWindow::writeSCPIStatement(const QString &command) const {
+  if (!this->m_port) {
+    std::cerr << "No port open, refusing writeSCPI\n";
+    return;
+  }
+  // qDebug() << "Writing " << command;
+  this->m_port->write(QString(command + "\r\n").toLocal8Bit());
+  this->m_port->flush();
+  QThread::msleep(10);
+}
+
+QString MainWindow::writeSCPICommand(const QString &command) const {
   if (!this->m_port) {
     std::cerr << "No port open, refusing writeSCPI\n";
     return nullptr;
@@ -399,13 +405,13 @@ QString MainWindow::writeSCPI(const QString &command, bool readResponse) {
   this->m_port->write(QString(command + "\r\n").toLocal8Bit());
   this->m_port->flush();
   QThread::msleep(10);
-  return readResponse ? readSCPI() : "";
+  return readSCPI();
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
   if (obj == measurement) {
     if (event->type() == QEvent::MouseButtonRelease) {
-      if (const QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+      if (const QMouseEvent *mouseEvent = dynamic_cast<QMouseEvent *>(event);
           mouseEvent->button() == Qt::LeftButton) {
         onMeasurementClicked();
         return true;
@@ -416,6 +422,6 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
 }
 
 void MainWindow::onMeasurementClicked() {
-  this->settings->save();
+  MainWindow::settings->save();
   openConnectDialog();
 }
