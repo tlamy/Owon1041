@@ -1,94 +1,92 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include <QMainWindow>
 #include <QLabel>
+#include <QMainWindow>
 #include <QPushButton>
 
 #include "ConnectDialog.h"
 #include "Settings.h"
 
 class MainWindow final : public QMainWindow {
-    Q_OBJECT
+  Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget *parent = nullptr);
+  explicit MainWindow(QWidget *parent = nullptr);
 
-    ~MainWindow() override;
+  ~MainWindow() override;
 
-    void setupUi(QMainWindow *MainWindow);
+  void setupUi(QMainWindow *MainWindow);
 
-    static Settings *settings;
+  static Settings *settings;
 
 protected:
-    void resizeEvent(QResizeEvent *event) override;
+  void resizeEvent(QResizeEvent *event) override;
 
-    void setupPositions(int width, int height) const;
+  void setupPositions(int width, int height) const;
 
 private slots:
-    void onVoltage50V();
+  void onVoltage50V();
 
-    void onVoltageAuto();
+  void onVoltageAuto();
 
-    void onShort();
+  void onShort();
 
-    void onDiode();
+  void onDiode();
 
-    void onResistance50K();
+  void onResistance50K();
 
-    void onResistanceAuto();
+  void onResistanceAuto();
 
-    void onCapacitance50uF();
+  void onCapacitance50uF();
 
-    void onCapacitanceAuto();
+  void onCapacitanceAuto();
 
-    void onFrequency();
+  void onFrequency();
 
-    void onPeriod();
+  void onPeriod();
 
-    void onSerialError(const QString &message);
+  void onSerialError(const QString &message);
 
-    QString readSCPI();
+  QString readSCPI();
 
-    QString writeSCPI(const QString &command, bool readResponse);
+  QString writeSCPI(const QString &command, bool readResponse);
 
-    bool eventFilter(QObject *obj, QEvent *event) override;
+  bool eventFilter(QObject *obj, QEvent *event) override;
 
-    void onMeasurementClicked();
+  void onMeasurementClicked();
 
-    void updateMeasurement(); // Make sure this exists and is declared as a slot
-
+  void updateMeasurement(); // Make sure this exists and is declared as a slot
 
 private:
-    // UI elements as member variables (excluding centralwidget)
-    QLabel *measurement;
-    QPushButton *btn_50_v;
-    QPushButton *btn_auto_v;
-    QPushButton *btn_short;
-    QPushButton *btn_diode;
-    QPushButton *btn_50_kr;
-    QPushButton *btn_auto_r;
-    QPushButton *btn_50_f;
-    QPushButton *btn_auto_f;
-    QPushButton *btn_freq;
-    QPushButton *btn_period;
+  // UI elements as member variables (excluding centralwidget)
+  QLabel *measurement;
+  QPushButton *btn_50_v;
+  QPushButton *btn_auto_v;
+  QPushButton *btn_short;
+  QPushButton *btn_diode;
+  QPushButton *btn_50_kr;
+  QPushButton *btn_auto_r;
+  QPushButton *btn_50_f;
+  QPushButton *btn_auto_f;
+  QPushButton *btn_freq;
+  QPushButton *btn_period;
 
-    ConnectDialog *m_connect_dialog;
-    QString m_unit;
+  ConnectDialog *m_connect_dialog;
+  QString m_unit;
 
-    void connectSerial();
+  void connectSerial();
 
-    static QString rateToSerial(Settings::Rate rate);
+  static QString rateToSerial(Settings::Rate rate);
 
-    void onConnect();
+  void onConnect();
 
-    bool openConnectDialog();
+  bool openConnectDialog();
 
-    void setupConnections();
+  void setupConnections();
 
-
-    QTimer *m_timer = nullptr;
-    QSerialPort *m_port = nullptr;
+  QTimer *m_timer = nullptr;
+  QSerialPort *m_port = nullptr;
 };
 
 #endif // MAINWINDOW_H
