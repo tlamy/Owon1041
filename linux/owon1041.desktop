@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Owon1041
+Comment=OWON XDM-1041 Multimeter Interface
+Exec=Owon1041
+Icon=owon1041
+Terminal=false
+Categories=Utility;Electronics;Science;
+Keywords=multimeter;owon;measurement;
