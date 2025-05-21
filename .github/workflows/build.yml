@@ -33,7 +33,7 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev
+          sudo apt-get install -y libqt6serialport6-dev
 
       # macOS code signing setup
       - name: Import Code-Signing Certificates
@@ -58,9 +58,9 @@ jobs:
       - name: Sign the macOS application
         if: matrix.os == 'macos-latest'
         env:
-          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TEAM_ID: ${{ secrets.APPLE_SIGNING_ID }}
         run: |
-          /usr/bin/codesign --force --options runtime --sign "Developer ID Application: $TEAM_ID" --verbose "${{github.workspace}}/build/usbc-power-osd.app"
+          /usr/bin/codesign --force --options runtime --sign "Developer ID Application: $TEAM_ID" --verbose "${{github.workspace}}/build/owon1041.app"
 
       # macOS notarization (optional but recommended)
       - name: Notarize the macOS application
@@ -71,24 +71,24 @@ jobs:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           # Create a ZIP archive of the app
-          ditto -c -k --keepParent "${{github.workspace}}/build/usbc-power-osd.app" "${{github.workspace}}/build/usbc-power-osd.zip"
+          ditto -c -k --keepParent "${{github.workspace}}/build/owon1041.app" "${{github.workspace}}/build/owon1041.zip"
           
           # Notarize the app
-          xcrun notarytool submit "${{github.workspace}}/build/usbc-power-osd.zip" \
+          xcrun notarytool submit "${{github.workspace}}/build/owon1041.zip" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_ID_PASSWORD" \
             --team-id "$TEAM_ID" \
             --wait
           
           # Staple the notarization ticket
-          xcrun stapler staple "${{github.workspace}}/build/usbc-power-osd.app"
+          xcrun stapler staple "${{github.workspace}}/build/owon1041.app"
 
       - name: Upload Windows artifacts
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: ${{github.workspace}}/build/Release/usbc-power-osd.exe
+          path: ${{github.workspace}}/build/Release/owon1041.exe
           if-no-files-found: error
 
       - name: Upload macOS artifacts
@@ -96,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-build
-          path: ${{github.workspace}}/build/usbc-power-osd.app
+          path: ${{github.workspace}}/build/owon1041.app
           if-no-files-found: error
 
       - name: Upload Linux artifacts
@@ -104,5 +104,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-build
-          path: ${{github.workspace}}/build/usbc-power-osd
+          path: ${{github.workspace}}/build/owon1041
           if-no-files-found: error
