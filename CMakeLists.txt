@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.31)
-project(Owon1041)
+cmake_minimum_required(VERSION 3.16)
+project(Owon1041 VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC ON)
@@ -16,14 +16,6 @@ set(QT_COMMON_PATHS
     "/usr/local/qt6"
     "C:/Qt/6.5.0/msvc2019_64"
     "C:/Qt/6.5.0/mingw_64"
-    # Qt5 paths as fallback
-    "/opt/homebrew/opt/qt@5"
-    "/opt/homebrew/opt/qt5"
-    "/usr/local/opt/qt@5"
-    "/usr/local/opt/qt5"
-    "/usr/local/qt5"
-    "C:/Qt/5.15.2/msvc2019_64"
-    "C:/Qt/5.15.2/mingw81_64"
 )
 
 # Find the first valid Qt path
@@ -45,28 +37,38 @@ find_package(Qt${QT_VERSION_MAJOR} COMPONENTS
     QUIET
 )
 
-# If Qt6 not found, try Qt5
-if(NOT Qt${QT_VERSION_MAJOR}_FOUND)
-    set(QT_VERSION_MAJOR 5)
-    find_package(Qt${QT_VERSION_MAJOR} COMPONENTS
-        Core
-        Gui
-        Widgets
-        SerialPort
-        REQUIRED
-    )
-    message(STATUS "Using Qt5 as Qt6 was not found")
-else()
-    message(STATUS "Using Qt6")
+# Define macOS bundle properties
+set(MACOSX_BUNDLE_BUNDLE_NAME "Owon1041")
+set(MACOSX_BUNDLE_GUI_IDENTIFIER "de.macwake.Owon1041")
+set(MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION})
+set(MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION})
+set(MACOSX_BUNDLE_LONG_VERSION_STRING "${PROJECT_VERSION}")
+set(MACOSX_BUNDLE_COPYRIGHT "Copyright © 2025 MacWake. All rights reserved.")
+set(MACOSX_BUNDLE_INFO_STRING "OWON XDM-1041 Multimeter Interface")
+
+# Icons setup based on platform
+if(APPLE)
+    # macOS icon
+    set(MACOSX_BUNDLE_ICON_FILE Owon.icns)
+    set(APP_ICON_MACOSX ${CMAKE_CURRENT_SOURCE_DIR}/Owon.icns)
+    set_source_files_properties(${APP_ICON_MACOSX} PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources")
+    set(PLATFORM_SPECIFIC_ICON_FILES ${APP_ICON_MACOSX})
+elseif(UNIX AND NOT APPLE)
+    # Linux doesn't use resource files in the executable directly
+    set(PLATFORM_SPECIFIC_ICON_FILES "")
 endif()
 
-add_executable(Owon1041 main.cpp
-    MainWindow.cpp
-    MainWindow.h
-    Settings.cpp
-    Settings.h
-    ConnectDialog.cpp
-    ConnectDialog.h
+# Add executable with platform-specific resources
+add_executable(Owon1041 
+    ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/MainWindow.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/MainWindow.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Settings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Settings.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/ConnectDialog.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ConnectDialog.h
+    ${PLATFORM_SPECIFIC_ICON_FILES}
 )
 
 target_link_libraries(Owon1041
@@ -75,3 +77,61 @@ target_link_libraries(Owon1041
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::SerialPort
 )
+
+# Set platform-specific properties
+if(APPLE)
+    set_target_properties(Owon1041 PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME "${MACOSX_BUNDLE_BUNDLE_NAME}"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${MACOSX_BUNDLE_BUNDLE_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${MACOSX_BUNDLE_SHORT_VERSION_STRING}"
+        MACOSX_BUNDLE_LONG_VERSION_STRING "${MACOSX_BUNDLE_LONG_VERSION_STRING}"
+        MACOSX_BUNDLE_COPYRIGHT "${MACOSX_BUNDLE_COPYRIGHT}"
+        MACOSX_BUNDLE_INFO_STRING "${MACOSX_BUNDLE_INFO_STRING}"
+        MACOSX_BUNDLE_ICON_FILE "${MACOSX_BUNDLE_ICON_FILE}"
+    )
+    
+    # Set High DPI support
+    target_compile_definitions(Owon1041 PRIVATE
+        "QT_MAC_WANTS_LAYER=1"
+    )
+elseif(UNIX AND NOT APPLE)
+    # Installation paths for Linux
+    include(GNUInstallDirs)
+    
+    # Install the executable
+    install(TARGETS Owon1041
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+    
+    # Install desktop file
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/owon1041.desktop
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
+    )
+    
+    # Install icons in various sizes
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/icons/16x16/owon1041.png
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps
+    )
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/icons/32x32/owon1041.png
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps
+    )
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/icons/48x48/owon1041.png
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps
+    )
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/icons/64x64/owon1041.png
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps
+    )
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/icons/128x128/owon1041.png
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps
+    )
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/icons/256x256/owon1041.png
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps
+    )
+    
+    # Install SVG icon
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/icons/scalable/owon1041.svg
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps
+    )
+endif()
