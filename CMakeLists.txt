@@ -16,14 +16,6 @@ set(QT_COMMON_PATHS
     "/usr/local/qt6"
     "C:/Qt/6.5.0/msvc2019_64"
     "C:/Qt/6.5.0/mingw_64"
-    # Qt5 paths as fallback
-    "/opt/homebrew/opt/qt@5"
-    "/opt/homebrew/opt/qt5"
-    "/usr/local/opt/qt@5"
-    "/usr/local/opt/qt5"
-    "/usr/local/qt5"
-    "C:/Qt/5.15.2/msvc2019_64"
-    "C:/Qt/5.15.2/mingw81_64"
 )
 
 # Find the first valid Qt path
@@ -44,21 +36,6 @@ find_package(Qt${QT_VERSION_MAJOR} COMPONENTS
     SerialPort
     QUIET
 )
-
-# If Qt6 not found, try Qt5
-if(NOT Qt${QT_VERSION_MAJOR}_FOUND)
-    set(QT_VERSION_MAJOR 5)
-    find_package(Qt${QT_VERSION_MAJOR} COMPONENTS
-        Core
-        Gui
-        Widgets
-        SerialPort
-        REQUIRED
-    )
-    message(STATUS "Using Qt5 as Qt6 was not found")
-else()
-    message(STATUS "Using Qt6")
-endif()
 
 # Define macOS bundle properties
 set(MACOSX_BUNDLE_BUNDLE_NAME "Owon1041")
