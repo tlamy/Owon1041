@@ -68,14 +68,11 @@ jobs:
         run: cmake --build ${{github.workspace}}/build --config ${{matrix.build_type}}
 
       # After the build step but before code signing, add:
-      - name: Deploy Qt dependencies
+      - name: Deploy and Sign Qt dependencies
         if: matrix.os == 'macos-latest'
         run: |
-          echo "Deploying Qt frameworks to app bundle"
-          macdeployqt "${{github.workspace}}/build/Owon1041.app" -always-overwrite -verbose=2
-          # Verify the deployment
-          ls -la "${{github.workspace}}/build/Owon1041.app/Contents/Frameworks/"
-          otool -L "${{github.workspace}}/build/Owon1041.app/Contents/MacOS/Owon1041"
+          echo "Deploying and signing Qt frameworks to app bundle"
+          macdeployqt "${{github.workspace}}/build/Owon1041.app" -always-overwrite -verbose=2 -sign-for-notarization="Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}"
 
       # macOS code signing
       - name: Sign the macOS application

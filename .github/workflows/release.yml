@@ -69,19 +69,52 @@ jobs:
       - name: Build
         run: cmake --build ${{github.workspace}}/build --config ${{matrix.build_type}}
 
-      # After building, run macdeployqt to copy Qt frameworks to the app bundle
-      - name: Deploy Qt dependencies
+      # Deploy and sign Qt components in one step (preferred method)
+      - name: Deploy and Sign Qt dependencies
         if: matrix.os == 'macos-latest'
         run: |
-          echo "Deploying Qt frameworks to app bundle"
-          macdeployqt "${{github.workspace}}/build/Owon1041.app" -always-overwrite -verbose=2
+          echo "Deploying and signing Qt frameworks to app bundle"
+          echo "Qt directory: $Qt6_DIR"
+          ls -la "${{github.workspace}}/build/"
+          
+          # Fix case sensitivity issue if needed
+          if [ -d "${{github.workspace}}/build/owon1041.app" ] && [ ! -d "${{github.workspace}}/build/Owon1041.app" ]; then
+            echo "Renaming app bundle for consistency"
+            mv "${{github.workspace}}/build/owon1041.app" "${{github.workspace}}/build/Owon1041.app"
+          fi
+          
+          # Deploy and sign
+          macdeployqt "${{github.workspace}}/build/Owon1041.app" -always-overwrite -verbose=3 -sign-for-notarization="Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}"
+          
+          # Verify deployment
+          echo "Verifying deployment:"
+          ls -la "${{github.workspace}}/build/Owon1041.app/Contents/Frameworks/"
+          ls -la "${{github.workspace}}/build/Owon1041.app/Contents/PlugIns/"
+          otool -L "${{github.workspace}}/build/Owon1041.app/Contents/MacOS/Owon1041"
 
-      # macOS code signing
-      - name: Sign the macOS application
-        if: matrix.os == 'macos-latest'
-        run: |
-          echo "Signing with Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}"
-          /usr/bin/codesign --force --options runtime --sign "Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}" --verbose "${{github.workspace}}/build/Owon1041.app"
+      # If the one-step approach above fails, uncomment this block:
+      # - name: Sign individual components manually
+      #   if: matrix.os == 'macos-latest'
+      #   run: |
+      #     echo "Signing all Qt frameworks and plugins in the app bundle"
+      #     # Sign frameworks
+      #     find "${{github.workspace}}/build/Owon1041.app/Contents/Frameworks" -type f -name "*.framework" -o -name "*.dylib" | while read -r file; do
+      #       echo "Signing $file"
+      #       /usr/bin/codesign --force --options runtime --sign "Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}" --verbose "$file"
+      #     done
+      #     
+      #     # Sign plugins
+      #     find "${{github.workspace}}/build/Owon1041.app/Contents/PlugIns" -type f -name "*.dylib" | while read -r file; do
+      #       echo "Signing $file"
+      #       /usr/bin/codesign --force --options runtime --sign "Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}" --verbose "$file"
+      #     done
+      #
+      #   # Then sign the main app bundle
+      #   - name: Sign the macOS application
+      #     if: matrix.os == 'macos-latest'
+      #     run: |
+      #       echo "Signing with Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}"
+      #       /usr/bin/codesign --force --options runtime --sign "Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}" --verbose "${{github.workspace}}/build/Owon1041.app"
 
       # macOS notarization
       - name: Notarize the macOS application
@@ -113,14 +146,24 @@ jobs:
       - name: Create Windows installer
         if: matrix.os == 'windows-latest'
         run: |
-          # Package as ZIP for Windows
-          7z a -tzip "${{github.workspace}}/build/Owon1041-${{ steps.get_version.outputs.VERSION }}-Windows.zip" "${{github.workspace}}/build/Release/Owon1041.exe"
+          # Fix case sensitivity if needed
+          if (Test-Path "${{github.workspace}}\build\Release\owon1041.exe" -PathType Leaf) {
+            echo "Using lowercase executable name"
+            7z a -tzip "${{github.workspace}}\build\Owon1041-${{ steps.get_version.outputs.VERSION }}-Windows.zip" "${{github.workspace}}\build\Release\owon1041.exe"
+          } else {
+            echo "Using uppercase executable name"
+            7z a -tzip "${{github.workspace}}\build\Owon1041-${{ steps.get_version.outputs.VERSION }}-Windows.zip" "${{github.workspace}}\build\Release\Owon1041.exe"
+          }
       
       - name: Create Linux package
         if: matrix.os == 'ubuntu-22.04'
         run: |
-          # Package as tar.gz
-          tar -czvf "${{github.workspace}}/build/Owon1041-${{ steps.get_version.outputs.VERSION }}-Linux.tar.gz" -C "${{github.workspace}}/build" Owon1041
+          # Check executable name capitalization
+          if [ -f "${{github.workspace}}/build/owon1041" ]; then
+            tar -czvf "${{github.workspace}}/build/Owon1041-${{ steps.get_version.outputs.VERSION }}-Linux.tar.gz" -C "${{github.workspace}}/build" owon1041
+          else
+            tar -czvf "${{github.workspace}}/build/Owon1041-${{ steps.get_version.outputs.VERSION }}-Linux.tar.gz" -C "${{github.workspace}}/build" Owon1041
+          fi
       
       # Upload artifacts
       - name: Upload release artifacts
