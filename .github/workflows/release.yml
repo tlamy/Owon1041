@@ -10,10 +10,20 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+        build_type: [ Release ]
+        include:
+          - os: windows-latest
+            generator: "Visual Studio 17 2022"
+          - os: ubuntu-22.04
+            generator: "Unix Makefiles"
+          - os: macos-latest
+            generator: "Unix Makefiles"
         
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       # Extract version from tag
       - name: Extract version from tag
@@ -21,30 +31,53 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
         shell: bash
       
-      - name: Set up CMake
-        uses: lukka/get-cmake@latest
-        
-      - name: Set up Qt
+      # Install Qt for all platforms
+      - name: Install Qt
         uses: jurplel/install-qt-action@v3
         with:
           version: '6.5.0'
-          
-      - name: Build
+          host: ${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'mac' || 'linux' }}
+          target: 'desktop'
+          arch: ${{ matrix.os == 'windows-latest' && 'win64_msvc2019_64' || matrix.os == 'macos-latest' && 'clang_64' || 'gcc_64' }}
+          modules: 'qtserialport'
+          setup-python: true
+
+      # Install additional Linux dependencies if needed
+      - name: Install additional Linux dependencies
+        if: matrix.os == 'ubuntu-22.04'
         run: |
-          mkdir build
-          cd build
-          cmake ..
-          cmake --build . --config Release
-          
-      # macOS specific steps
-      - name: Sign macOS Application
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libxkbcommon-x11-0
+
+      # macOS code signing setup
+      - name: Import Code-Signing Certificates
         if: matrix.os == 'macos-latest'
-        env:
-          APPLE_SIGNING_ID: ${{ vars.APPLE_SIGNING_ID }}
+        uses: Apple-Actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          keychain-password: ${{ github.run_id }}
+          
+      - name: Configure CMake
+        run: >
+          cmake -B ${{github.workspace}}/build 
+          -G "${{matrix.generator}}" 
+          -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
+          -DCMAKE_PREFIX_PATH=${{env.Qt6_DIR}}
+          ${{ matrix.os == 'macos-latest' && '-DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"' || '' }}
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build --config ${{matrix.build_type}}
+
+      # macOS code signing
+      - name: Sign the macOS application
+        if: matrix.os == 'macos-latest'
         run: |
+          echo "Signing with Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}"
           /usr/bin/codesign --force --options runtime --sign "Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}" --verbose "${{github.workspace}}/build/Owon1041.app"
-      
-      - name: Notarize macOS Application
+
+      # macOS notarization
+      - name: Notarize the macOS application
         if: matrix.os == 'macos-latest'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -63,42 +96,41 @@ jobs:
           # Staple the notarization ticket
           xcrun stapler staple "${{github.workspace}}/build/Owon1041.app"
       
+      # Create release packages
       - name: Create macOS package
         if: matrix.os == 'macos-latest'
         run: |
           # Create a DMG
           hdiutil create -volname "Owon1041" -srcfolder "${{github.workspace}}/build/Owon1041.app" -ov -format UDZO "${{github.workspace}}/build/Owon1041-${{ steps.get_version.outputs.VERSION }}.dmg"
       
-      # Windows specific steps
       - name: Create Windows installer
         if: matrix.os == 'windows-latest'
         run: |
           # Package as ZIP for Windows
           7z a -tzip "${{github.workspace}}/build/Owon1041-${{ steps.get_version.outputs.VERSION }}-Windows.zip" "${{github.workspace}}/build/Release/Owon1041.exe"
       
-      # Linux specific steps
       - name: Create Linux package
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           # Package as tar.gz
           tar -czvf "${{github.workspace}}/build/Owon1041-${{ steps.get_version.outputs.VERSION }}-Linux.tar.gz" -C "${{github.workspace}}/build" Owon1041
       
       # Upload artifacts
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: Owon1041-${{ matrix.os }}
+          name: release-artifacts-${{ matrix.os }}
           path: |
             ${{ matrix.os == 'macos-latest' && github.workspace }}/build/*.dmg
             ${{ matrix.os == 'windows-latest' && github.workspace }}/build/*.zip
-            ${{ matrix.os == 'ubuntu-latest' && github.workspace }}/build/*.tar.gz
+            ${{ matrix.os == 'ubuntu-22.04' && github.workspace }}/build/*.tar.gz
           if-no-files-found: error
 
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       # Extract version from tag
       - name: Extract version from tag
@@ -107,7 +139,7 @@ jobs:
           
       # Download all artifacts
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
           
@@ -122,8 +154,8 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            artifacts/Owon1041-macos-latest/*.dmg
-            artifacts/Owon1041-windows-latest/*.zip
-            artifacts/Owon1041-ubuntu-latest/*.tar.gz
+            artifacts/release-artifacts-macos-latest/*.dmg
+            artifacts/release-artifacts-windows-latest/*.zip
+            artifacts/release-artifacts-ubuntu-22.04/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
