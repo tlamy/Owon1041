@@ -69,6 +69,13 @@ jobs:
       - name: Build
         run: cmake --build ${{github.workspace}}/build --config ${{matrix.build_type}}
 
+      # After building, run macdeployqt to copy Qt frameworks to the app bundle
+      - name: Deploy Qt dependencies
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "Deploying Qt frameworks to app bundle"
+          macdeployqt "${{github.workspace}}/build/Owon1041.app" -always-overwrite -verbose=2
+
       # macOS code signing
       - name: Sign the macOS application
         if: matrix.os == 'macos-latest'

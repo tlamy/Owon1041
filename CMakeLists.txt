@@ -1,6 +1,16 @@
 cmake_minimum_required(VERSION 3.16)
 project(Owon1041 VERSION 1.0.0 LANGUAGES CXX)
 
+# Add this near the top, after your project() declaration
+if(APPLE)
+    # Set the install RPATH to the bundle framework location
+    set(CMAKE_INSTALL_RPATH "@executable_path/../Frameworks")
+    # Keep the RPATH even when installing
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+    # Make sure RPATHs are used on macOS
+    set(CMAKE_MACOSX_RPATH ON)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
