@@ -19,7 +19,7 @@ jobs:
         include:
           - os: windows-latest
             generator: "Visual Studio 17 2022"
-          - os: ubuntu-22.04  # Make sure to update this to match
+          - os: ubuntu-22.04
             generator: "Unix Makefiles"
           - os: macos-latest
             generator: "Unix Makefiles"
@@ -29,19 +29,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Linux dependencies
+      # Install Qt for all platforms
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.5.0'
+          host: ${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'mac' || 'linux' }}
+          target: 'desktop'
+          arch: ${{ matrix.os == 'windows-latest' && 'win64_msvc2019_64' || matrix.os == 'macos-latest' && 'clang_64' || 'gcc_64' }}
+          modules: 'qtserialport'
+          setup-python: true
+
+      # Install additional Linux dependencies if needed
+      - name: Install additional Linux dependencies
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libqt6serialport6-dev \
-            qt6-base-dev \
-            libqt6svg6-dev \
-            libqt6core6 \
-            libqt6gui6 \
-            libqt6widgets6 \
-            qt6-tools-dev \
-            qt6-tools-dev-tools
+          sudo apt-get install -y libgl1-mesa-dev libxkbcommon-x11-0
 
       # macOS code signing setup
       - name: Import Code-Signing Certificates
@@ -52,30 +56,21 @@ jobs:
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           keychain-password: ${{ github.run_id }}
 
-      - name: Install macOS dependencies
-        if: matrix.os == 'macos-latest'
+      # Debug Qt installation
+      - name: Debug Qt installation
         run: |
-          brew update
-          brew install qt@6
-          echo "$(brew --prefix qt@6)/bin" >> $GITHUB_PATH
-
-      - name: Install Qt (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: jurplel/install-qt-action@v3
-        with:
-          version: '6.5.0'
-          host: 'windows'
-          target: 'desktop'
-          arch: 'win64_msvc2019_64'
-          modules: 'qtserialport qtnetworkauth'
-          tools: 'tools_ninja tools_qtcreator'
+          echo "Qt6_DIR: $Qt6_DIR"
+          echo "QTDIR: $QTDIR"
+          echo "PATH: $PATH"
+          ls -la $QTDIR || echo "QTDIR not found"
 
       - name: Configure CMake
         run: >
           cmake -B ${{github.workspace}}/build 
           -G "${{matrix.generator}}" 
           -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
-          -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+          -DCMAKE_PREFIX_PATH=${{env.Qt6_DIR}}
+          ${{ matrix.os == 'macos-latest' && '-DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"' || '' }}
 
       - name: Build
         run: cmake --build ${{github.workspace}}/build --config ${{matrix.build_type}}
