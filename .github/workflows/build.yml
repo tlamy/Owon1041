@@ -56,14 +56,6 @@ jobs:
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           keychain-password: ${{ github.run_id }}
 
-      # Debug Qt installation
-      - name: Debug Qt installation
-        run: |
-          echo "Qt6_DIR: $Qt6_DIR"
-          echo "QTDIR: $QTDIR"
-          echo "PATH: $PATH"
-          ls -la $QTDIR || echo "QTDIR not found"
-
       - name: Configure CMake
         run: >
           cmake -B ${{github.workspace}}/build 
@@ -78,10 +70,9 @@ jobs:
       # macOS code signing
       - name: Sign the macOS application
         if: matrix.os == 'macos-latest'
-        env:
-          TEAM_ID: ${{ secrets.APPLE_SIGNING_ID }}
         run: |
-          /usr/bin/codesign --force --options runtime --sign "Developer ID Application: $TEAM_ID" --verbose "${{github.workspace}}/build/owon1041.app"
+          echo "Signing with Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}"
+          /usr/bin/codesign --force --options runtime --sign "Developer ID Application: ${{ vars.APPLE_SIGNING_ID }}" --verbose "${{github.workspace}}/build/Owon1041.app"
 
       # macOS notarization (optional but recommended)
       - name: Notarize the macOS application
@@ -120,10 +111,19 @@ jobs:
           path: ${{github.workspace}}/build/owon1041.app
           if-no-files-found: error
 
+      # For Linux
+      - name: Debug build output
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          echo "Listing build directory contents:"
+          ls -la ${{github.workspace}}/build/
+          echo "Finding executable by name:"
+          find ${{github.workspace}}/build -name "Owon*" -type f -executable
+
       - name: Upload Linux artifacts
         if: matrix.os == 'ubuntu-22.04'
         uses: actions/upload-artifact@v4
         with:
           name: linux-build
-          path: ${{github.workspace}}/build/owon1041
+          path: ${{github.workspace}}/build/Owon1041
           if-no-files-found: error
