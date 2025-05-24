@@ -80,7 +80,6 @@ jobs:
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           # Create a ZIP archive of the app
           ditto -c -k --keepParent "${{github.workspace}}/build/owon1041.app" "${{github.workspace}}/build/owon1041.zip"
@@ -89,7 +88,7 @@ jobs:
           xcrun notarytool submit "${{github.workspace}}/build/owon1041.zip" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_ID_PASSWORD" \
-            --team-id "$TEAM_ID" \
+            --team-id "{{ vars.APPLE_TEAM_ID }}" \
             --wait
           
           # Staple the notarization ticket
